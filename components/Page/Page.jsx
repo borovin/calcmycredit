@@ -1,5 +1,4 @@
 import Header from '../Header';
-import Footer from '../Footer';
 import usePageStyles from './Page.styles';
 
 const Page = (props) => {
@@ -12,7 +11,7 @@ const Page = (props) => {
       <main className={classes.main}>
         {children}
       </main>
-      <Footer />
+      {/* <Footer /> */}
     </>
   );
 };
