@@ -13,7 +13,7 @@ const App = ({ Component, pageProps }) => {
   return (
     <>
       <Head>
-        <title>Start App</title>
+        <title>Кредитный калькулятор</title>
         <link rel="stylesheet" href="/main.css" />
         <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet" />
       </Head>
