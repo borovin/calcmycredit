@@ -169,11 +169,11 @@ const MainPage = () => {
           <NoSsr>
             <pre>
               {JSON.stringify(_calc(
-                new Date(),
-                add(new Date(), { days: 1 }),
+                new Date(2020, 0, 21),
+                new Date(2020, 1, 12),
                 240,
-                1000000,
-                10,
+                4534128.44,
+                7.49,
                 0,
                 [],
               ), null, 2)}

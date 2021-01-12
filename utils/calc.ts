@@ -151,7 +151,7 @@ function minusMonths(a: Date, i: number): Date {
 function getPercentValueOfPayment(prevPaymentDate: Date, paymentDate: Date, creditBody: number, percent: number) {
   const multiplier = scale((creditBody * percent) / 100, 10);
   if (paymentDate.getFullYear() === prevPaymentDate.getFullYear()) {
-    return multiplier * scale(daysBetween(prevPaymentDate, paymentDate) / lengthOfYear(prevPaymentDate), 10);
+    return multiplier * scale(daysBetween(paymentDate, prevPaymentDate) / lengthOfYear(prevPaymentDate), 10);
   }
   /*
         Проц = ОД x Ставка x (1 янв 2012 - 22 дек 2011) / (100 * 365) + ОД x Ставка x (22 янв 2012 - 1 янв 2012) / (100 * 366)
@@ -159,8 +159,8 @@ function getPercentValueOfPayment(prevPaymentDate: Date, paymentDate: Date, cred
 
   const firstDateOfYear = new Date(paymentDate.getFullYear(), 0, 1);
   return multiplier * (
-    scale(daysBetween(prevPaymentDate, firstDateOfYear) / lengthOfYear(prevPaymentDate), 10)
-    + scale(daysBetween(firstDateOfYear, paymentDate) / lengthOfYear(prevPaymentDate), 10)
+    scale(daysBetween(firstDateOfYear, prevPaymentDate) / lengthOfYear(prevPaymentDate), 10)
+    + scale(daysBetween(paymentDate, firstDateOfYear) / lengthOfYear(prevPaymentDate), 10)
   );
 }
 
@@ -235,20 +235,20 @@ export default function processWithMonths(
     result.push(paymentInfo);
     paymentInfo.paymentDate = getNonWeekendDate(paymentDate);
     paymentInfo.creditBodyBeforePayment = creditBody;
-    paymentInfo.mandatoryPaymentPercent = percentValueOfPayment;
+    paymentInfo.mandatoryPaymentPercent = scale(percentValueOfPayment, 2);
 
     let filtered = null;
     if (first) {
       paymentInfo.creditBodyAfterPayment = creditBody;
-      paymentInfo.mandatoryPayment = percentValueOfPayment;
+      paymentInfo.mandatoryPayment = scale(percentValueOfPayment, 2);
       paymentInfo.mandatoryPaymentBody = 0;
     } else {
       if (mandatoryPayment > creditBody) {
-        paymentInfo.mandatoryPayment = creditBody + percentValueOfPayment;
+        paymentInfo.mandatoryPayment = scale(creditBody + percentValueOfPayment, 2);
         paymentInfo.mandatoryPaymentBody = creditBody;
       } else {
-        paymentInfo.mandatoryPayment = mandatoryPayment;
-        paymentInfo.mandatoryPaymentBody = mandatoryBodyPayment;
+        paymentInfo.mandatoryPayment = scale(mandatoryPayment, 2);
+        paymentInfo.mandatoryPaymentBody = scale(mandatoryBodyPayment, 2);
       }
 
       creditBody = Math.max(creditBody - mandatoryPayment + percentValueOfPayment, 0);
