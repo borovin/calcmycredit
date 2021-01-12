@@ -1,4 +1,3 @@
-// eslint-disable-next-line max-classes-per-file
 import {
   isBefore,
   isAfter,
@@ -8,15 +7,11 @@ import {
   getDaysInYear,
 } from 'date-fns';
 
-// eslint-disable-next-line no-shadow,max-classes-per-file,no-unused-vars
 enum EarlyRepaymentType {
-  // eslint-disable-next-line no-unused-vars
   REDUCTION_LOAN_TERM, REDUCTION_AMOUNT_PAYMENT
 }
 
-// eslint-disable-next-line no-shadow,no-unused-vars
 enum EarlyRepaymentPaymentType {
-  // eslint-disable-next-line no-unused-vars
   COMBINATION_FULL_PAYMENT, EARLY_REPAYMENT
 }
 
@@ -37,7 +32,6 @@ abstract class EarlyRepayment {
 
   payment: number;
 
-  // eslint-disable-next-line no-unused-vars
   public abstract isIncludePaymentDate(prevPaymentDate: Date, paymentDate: Date): boolean;
 
   public getType(): EarlyRepaymentType {
@@ -66,7 +60,6 @@ class OnceEarlyRepayment extends EarlyRepayment {
   }
 }
 
-// eslint-disable-next-line no-unused-vars
 class PeriodicEarlyRepayment extends EarlyRepayment {
   start: Date;
 
@@ -83,9 +76,7 @@ class PeriodicEarlyRepayment extends EarlyRepayment {
   }
 }
 
-// eslint-disable-next-line no-shadow,no-unused-vars
 enum PaymentType {
-  // eslint-disable-next-line no-unused-vars
   ANNUITY, DIFFERENTIATED
 }
 
@@ -117,7 +108,6 @@ function calcAnnuityPayment(percent: number, monthsCount: number, creditBody: nu
   return scale((creditBody * percentMonth * temp) / (temp - 1), 10);
 }
 
-// @ts-ignore
 function calcDifferentiatedBodyPayment(percent: number, monthsCount: number, creditBody: number) {
   return scale(creditBody / (monthsCount), 10);
 }
@@ -182,10 +172,8 @@ function filterEarlyRepayment(
   let payment = 0;
   let resPaymentType = null;
   let resType = null;
-  // eslint-disable-next-line no-restricted-syntax
   for (const earlyRepayment of earlyRepayments) {
     if (!earlyRepayment.isIncludePaymentDate(prevPaymentDate, paymentDate)) {
-      // eslint-disable-next-line no-continue
       continue;
     }
 
@@ -204,7 +192,6 @@ function filterEarlyRepayment(
     return null;
   }
 
-  // @ts-ignore
   return new OnceEarlyRepayment(resType, resPaymentType, payment, paymentDate);
 }
 
@@ -217,7 +204,6 @@ export default function processWithMonths(
   paymentType: PaymentType,
   earlyRepayments: Array<EarlyRepayment>,
 ) {
-  // eslint-disable-next-line no-array-constructor
   const result = new Array<PaymentInfo>();
   let first = dateOfContract != null;
   let leastMonths = months;
@@ -241,10 +227,8 @@ export default function processWithMonths(
   while (true) {
     const percentValueOfPayment = getPercentValueOfPayment(prevPaymentDate, paymentDate, creditBody, percent);
     if (PaymentType.ANNUITY === paymentType) {
-      // @ts-ignore
       mandatoryBodyPayment = mandatoryPayment - percentValueOfPayment;
     } else if (PaymentType.DIFFERENTIATED === paymentType) {
-      // @ts-ignore
       mandatoryPayment = mandatoryBodyPayment + percentValueOfPayment;
     }
     const paymentInfo = new PaymentInfo();
@@ -259,18 +243,14 @@ export default function processWithMonths(
       paymentInfo.mandatoryPayment = percentValueOfPayment;
       paymentInfo.mandatoryPaymentBody = 0;
     } else {
-      // @ts-ignore
       if (mandatoryPayment > creditBody) {
         paymentInfo.mandatoryPayment = creditBody + percentValueOfPayment;
         paymentInfo.mandatoryPaymentBody = creditBody;
       } else {
-        // @ts-ignore
         paymentInfo.mandatoryPayment = mandatoryPayment;
-        // @ts-ignore
         paymentInfo.mandatoryPaymentBody = mandatoryBodyPayment;
       }
 
-      // @ts-ignore
       creditBody = Math.max(creditBody - mandatoryPayment + percentValueOfPayment, 0);
 
       if (earlyRepayments.length > 0) {
@@ -278,7 +258,6 @@ export default function processWithMonths(
 
         if (filtered != null) {
           if (EarlyRepaymentPaymentType.COMBINATION_FULL_PAYMENT === filtered.getPaymentType()) {
-            // @ts-ignore
             const leastReadyToPay = filtered.getPayment() - mandatoryPayment;
             if (leastReadyToPay >= creditBody) {
               paymentInfo.earlyRepayment = creditBody;
@@ -312,7 +291,6 @@ export default function processWithMonths(
 
     if (first) {
       first = false;
-      // eslint-disable-next-line max-len
     } else if (filtered != null && EarlyRepaymentType.REDUCTION_AMOUNT_PAYMENT === filtered.getType()) {
       if (PaymentType.ANNUITY === paymentType) {
         mandatoryPayment = calcAnnuityPayment(percent, leastMonths, creditBody);
@@ -326,11 +304,9 @@ export default function processWithMonths(
 }
 
 function printReport(payments: Array<PaymentInfo>) {
-//        System.out.println("Порядковый номер\tДата платежа\tОстаток долга\tПлатеж обязательный\tПлатеж Обязательный тело\tПлатеж Обязательный проценты\tДосрочная часть\tОстаток долга на конец периода");
   let totalPercentValue = 0;
   let total = 0;
   let months = 0;
-  // eslint-disable-next-line no-restricted-syntax
   for (const p of payments) {
     //            System.out.println(MessageFormat.format(
     //                    "{0}\t{1}\t{2,number,#}\t{3,number,#}\t{4,number,#}\t{5,number,#}\t{6,number,#}\t{7,number,#}",
@@ -345,7 +321,6 @@ function printReport(payments: Array<PaymentInfo>) {
   console.log(` Total months:${months}`);
 }
 
-// eslint-disable-next-line no-unused-vars
 function main() {
   const val = 100000;
   const contract = new Date(2020, 1, 21);

@@ -1,11 +1,15 @@
 /* eslint-disable react/jsx-props-no-spreading */
 import {
-  Grid, TextField, Typography, Button, Divider,
+  Grid, TextField, Typography, Button, Divider, NoSsr,
 } from '@material-ui/core';
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
+import {
+  add,
+} from 'date-fns';
 import Page from '../components/Page';
 import pageStyles from '../components/Page/Page.module.css';
+import _calc from '../utils/calc.ts';
 
 const calc = ({ sum, rate, payment }) => {
   if (sum && rate && payment) {
@@ -162,6 +166,19 @@ const MainPage = () => {
             рассказать про нашу стратегию, почему нужно уменьшить обязательный платеж
             и вносить максимально возможную сумму регулярно и досрочно
           </Typography>
+          <NoSsr>
+            <pre>
+              {JSON.stringify(_calc(
+                new Date(),
+                add(new Date(), { days: 1 }),
+                240,
+                1000000,
+                10,
+                0,
+                [],
+              ), null, 2)}
+            </pre>
+          </NoSsr>
         </Grid>
       </Grid>
     </Page>
