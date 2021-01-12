@@ -101,14 +101,14 @@ function scale(val: number, s: number): number {
   return Math.round(val * realScale) / realScale;
 }
 
-function calcAnnuityPayment(percent: number, monthsCount: number, creditBody: number) {
+function calcAnnuityPayment(percent: number, monthsCount: number, creditBody: number): number {
   const percentMonth = scale(percent / (12 * 100), 10);
   const temp = (1 + percentMonth) ** monthsCount;
 
   return scale((creditBody * percentMonth * temp) / (temp - 1), 10);
 }
 
-function calcDifferentiatedBodyPayment(percent: number, monthsCount: number, creditBody: number) {
+function calcDifferentiatedBodyPayment(percent: number, monthsCount: number, creditBody: number): number {
   return scale(creditBody / (monthsCount), 10);
 }
 
@@ -148,7 +148,7 @@ function minusMonths(a: Date, i: number): Date {
   });
 }
 
-function getPercentValueOfPayment(prevPaymentDate: Date, paymentDate: Date, creditBody: number, percent: number) {
+function getPercentValueOfPayment(prevPaymentDate: Date, paymentDate: Date, creditBody: number, percent: number) : number {
   const multiplier = scale((creditBody * percent) / 100, 10);
   if (paymentDate.getFullYear() === prevPaymentDate.getFullYear()) {
     return multiplier * scale(daysBetween(paymentDate, prevPaymentDate) / lengthOfYear(prevPaymentDate), 10);
@@ -168,7 +168,7 @@ function filterEarlyRepayment(
   earlyRepayments: Array<EarlyRepayment>,
   prevPaymentDate: Date,
   paymentDate: Date,
-) {
+): OnceEarlyRepayment {
   let payment = 0;
   let resPaymentType = null;
   let resType = null;
@@ -203,7 +203,7 @@ export default function processWithMonths(
   percent: number,
   paymentType: PaymentType,
   earlyRepayments: Array<EarlyRepayment>,
-) {
+): Array<PaymentInfo> {
   const result = new Array<PaymentInfo>();
   let first = dateOfContract != null;
   let leastMonths = months;
