@@ -128,30 +128,10 @@ function getNonWeekendDate(date: Date): Date {
   return date;
 }
 
-function daysBetween(a: Date, b: Date): number {
-  return differenceInDays(a, b);
-}
-
-function lengthOfYear(a: Date): number {
-  return getDaysInYear(a);
-}
-
-function plusMonths(a: Date, i: number): Date {
-  return add(a, {
-    months: i,
-  });
-}
-
-function minusMonths(a: Date, i: number): Date {
-  return add(a, {
-    months: -i,
-  });
-}
-
-function getPercentValueOfPayment(prevPaymentDate: Date, paymentDate: Date, creditBody: number, percent: number) : number {
+function getPercentValueOfPayment(prevPaymentDate: Date, paymentDate: Date, creditBody: number, percent: number): number {
   const multiplier = scale((creditBody * percent) / 100, 10);
   if (paymentDate.getFullYear() === prevPaymentDate.getFullYear()) {
-    return multiplier * scale(daysBetween(paymentDate, prevPaymentDate) / lengthOfYear(prevPaymentDate), 10);
+    return multiplier * scale(differenceInDays(paymentDate, prevPaymentDate) / getDaysInYear(prevPaymentDate), 10);
   }
   /*
         Проц = ОД x Ставка x (1 янв 2012 - 22 дек 2011) / (100 * 365) + ОД x Ставка x (22 янв 2012 - 1 янв 2012) / (100 * 366)
@@ -159,8 +139,8 @@ function getPercentValueOfPayment(prevPaymentDate: Date, paymentDate: Date, cred
 
   const firstDateOfYear = new Date(paymentDate.getFullYear(), 0, 1);
   return multiplier * (
-    scale(daysBetween(firstDateOfYear, prevPaymentDate) / lengthOfYear(prevPaymentDate), 10)
-    + scale(daysBetween(paymentDate, firstDateOfYear) / lengthOfYear(prevPaymentDate), 10)
+    scale(differenceInDays(firstDateOfYear, prevPaymentDate) / getDaysInYear(prevPaymentDate), 10)
+    + scale(differenceInDays(paymentDate, firstDateOfYear) / getDaysInYear(prevPaymentDate), 10)
   );
 }
 
@@ -195,40 +175,44 @@ function filterEarlyRepayment(
   return new OnceEarlyRepayment(resType, resPaymentType, payment, paymentDate);
 }
 
+class CreditInput {
+  dateOfContract: Date;
+  dateFirstPayment: Date;
+  months: number;
+  credit: number;
+  percent: number;
+  paymentType: PaymentType;
+}
+
 export default function processWithMonths(
-  dateOfContract: Date,
-  dateFirstPayment: Date,
-  months: number,
-  credit: number,
-  percent: number,
-  paymentType: PaymentType,
-  earlyRepayments: Array<EarlyRepayment>,
+  input: CreditInput,
+  earlyRepayments: Array<EarlyRepayment>
 ): Array<PaymentInfo> {
   const result = new Array<PaymentInfo>();
-  let first = dateOfContract != null;
-  let leastMonths = months;
-  const monthForCalc = dateOfContract != null ? (months - 1) : months;
+  let first = input.dateOfContract != null;
+  let leastMonths = input.months;
+  const monthForCalc = input.dateOfContract != null ? (input.months - 1) : input.months;
 
-  let prevPaymentDate = dateOfContract != null ? dateOfContract : minusMonths(dateFirstPayment, 1);
-  let paymentDate = dateFirstPayment;
-  let creditBody = credit;
+  let prevPaymentDate = input.dateOfContract != null ? input.dateOfContract : add(input.dateFirstPayment, { months: -1, });
+  let paymentDate = input.dateFirstPayment;
+  let creditBody = input.credit;
 
   let mandatoryPayment = null;
   let mandatoryBodyPayment = null;
 
-  if (PaymentType.DIFFERENTIATED === paymentType) {
-    mandatoryBodyPayment = calcDifferentiatedBodyPayment(percent, monthForCalc, creditBody);
-  } else if (PaymentType.ANNUITY === paymentType) {
-    mandatoryPayment = calcAnnuityPayment(percent, monthForCalc, creditBody);
+  if (PaymentType.DIFFERENTIATED === input.paymentType) {
+    mandatoryBodyPayment = calcDifferentiatedBodyPayment(input.percent, monthForCalc, creditBody);
+  } else if (PaymentType.ANNUITY === input.paymentType) {
+    mandatoryPayment = calcAnnuityPayment(input.percent, monthForCalc, creditBody);
   } else {
     throw new Error('Incorrect Payment Type');
   }
 
   while (true) {
-    const percentValueOfPayment = getPercentValueOfPayment(prevPaymentDate, paymentDate, creditBody, percent);
-    if (PaymentType.ANNUITY === paymentType) {
+    const percentValueOfPayment = getPercentValueOfPayment(prevPaymentDate, paymentDate, creditBody, input.percent);
+    if (PaymentType.ANNUITY === input.paymentType) {
       mandatoryBodyPayment = mandatoryPayment - percentValueOfPayment;
-    } else if (PaymentType.DIFFERENTIATED === paymentType) {
+    } else if (PaymentType.DIFFERENTIATED === input.paymentType) {
       mandatoryPayment = mandatoryBodyPayment + percentValueOfPayment;
     }
     const paymentInfo = new PaymentInfo();
@@ -282,7 +266,7 @@ export default function processWithMonths(
     }
 
     prevPaymentDate = paymentDate;
-    paymentDate = plusMonths(paymentDate, 1);
+    paymentDate = add(paymentDate, { months: 1, });
     leastMonths -= 1;
 
     if (scale(creditBody, 2) === 0) {
@@ -292,10 +276,10 @@ export default function processWithMonths(
     if (first) {
       first = false;
     } else if (filtered != null && EarlyRepaymentType.REDUCTION_AMOUNT_PAYMENT === filtered.getType()) {
-      if (PaymentType.ANNUITY === paymentType) {
-        mandatoryPayment = calcAnnuityPayment(percent, leastMonths, creditBody);
-      } else if (PaymentType.DIFFERENTIATED === paymentType) {
-        mandatoryBodyPayment = calcDifferentiatedBodyPayment(percent, leastMonths, creditBody);
+      if (PaymentType.ANNUITY === input.paymentType) {
+        mandatoryPayment = calcAnnuityPayment(input.percent, leastMonths, creditBody);
+      } else if (PaymentType.DIFFERENTIATED === input.paymentType) {
+        mandatoryBodyPayment = calcDifferentiatedBodyPayment(input.percent, leastMonths, creditBody);
       }
     }
   }
@@ -322,77 +306,81 @@ function printReport(payments: Array<PaymentInfo>) {
 }
 
 function main() {
-  const val = 100000;
-  const contract = new Date(2020, 1, 21);
-  const startDate = new Date(2020, 2, 12);
-  const months = 240;
-  const credit = 4534128.44;
-  const percent = 7.49;
+  let payment = 100000;
 
   printReport(processWithMonths(
-    contract,
-    startDate,
-    months,
-    credit,
-    percent,
-    PaymentType.DIFFERENTIATED,
+    {
+      dateOfContract: new Date(2020, 1, 21),
+      dateFirstPayment: new Date(2020, 2, 12),
+      months: 240,
+      percent: 7.49,
+      credit: 4534128.44,
+      paymentType: PaymentType.DIFFERENTIATED,
+    },
     [
       new PeriodicEarlyRepayment(
         EarlyRepaymentType.REDUCTION_AMOUNT_PAYMENT,
         EarlyRepaymentPaymentType.COMBINATION_FULL_PAYMENT,
-        val,
-        startDate,
+        payment,
+        new Date(2020, 2, 12),
         null,
       ),
     ],
   ));
+
   printReport(processWithMonths(
-    contract,
-    startDate,
-    months,
-    credit,
-    percent,
-    PaymentType.DIFFERENTIATED,
+    {
+      dateOfContract: new Date(2020, 1, 21),
+      dateFirstPayment: new Date(2020, 2, 12),
+      months: 240,
+      percent: 7.49,
+      credit: 4534128.44,
+      paymentType: PaymentType.DIFFERENTIATED,
+    },
     [
       new PeriodicEarlyRepayment(
         EarlyRepaymentType.REDUCTION_LOAN_TERM,
         EarlyRepaymentPaymentType.COMBINATION_FULL_PAYMENT,
-        val,
-        startDate,
+        payment,
+        new Date(2020, 2, 12),
         null,
       ),
     ],
   ));
   printReport(processWithMonths(
-    contract,
-    startDate,
-    months,
-    credit,
-    percent,
-    PaymentType.ANNUITY,
+    {
+      dateOfContract: new Date(2020, 1, 21),
+      dateFirstPayment: new Date(2020, 2, 12),
+      months: 240,
+      percent: 7.49,
+      credit: 4534128.44,
+      paymentType: PaymentType.ANNUITY,
+    },
     [
       new PeriodicEarlyRepayment(
         EarlyRepaymentType.REDUCTION_AMOUNT_PAYMENT,
         EarlyRepaymentPaymentType.COMBINATION_FULL_PAYMENT,
-        val,
-        startDate,
+        payment,
+        new Date(2020, 2, 12),
         null,
       ),
     ],
   ));
   printReport(processWithMonths(
-    contract,
-    startDate,
-    months,
-    credit,
-    percent,
-    PaymentType.ANNUITY,
+    {
+      dateOfContract: new Date(2020, 1, 21),
+      dateFirstPayment: new Date(2020, 2, 12),
+      months: 240,
+      percent: 7.49,
+      credit: 4534128.44,
+      paymentType: PaymentType.ANNUITY,
+    },
     [
       new PeriodicEarlyRepayment(
         EarlyRepaymentType.REDUCTION_LOAN_TERM,
         EarlyRepaymentPaymentType.COMBINATION_FULL_PAYMENT,
-        val,
-        startDate,
+        payment,
+        new Date(2020, 2, 12),
         null,
       ),
     ],

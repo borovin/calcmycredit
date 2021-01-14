@@ -169,12 +169,14 @@ const MainPage = () => {
           <NoSsr>
             <pre>
               {JSON.stringify(_calc(
-                new Date(2020, 0, 21),
-                new Date(2020, 1, 12),
-                240,
-                4534128.44,
-                7.49,
-                0,
+                {
+                  dateOfContract: new Date(2020, 1, 21),
+                  dateFirstPayment: new Date(2020, 2, 12),
+                  months: 240,
+                  percent: 7.49,
+                  credit: 4534128.44,
+                  paymentType: 0,
+                },
                 [],
               ), null, 2)}
             </pre>
