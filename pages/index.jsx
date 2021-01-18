@@ -11,67 +11,73 @@ import Page from '../components/Page';
 import pageStyles from '../components/Page/Page.module.css';
 import _calc from '../utils/calc.ts';
 
-const calc = ({ sum, rate, payment }) => {
-  if (sum && rate && payment) {
-    return {
-      years: 10,
-      months: 120,
-      sum: 2000000,
-      percent: 200,
-      minPayment: 10000,
-    };
+const calc = ({
+  sum, rate, payment, months,
+}) => {
+  if (sum && rate && payment && months) {
+    return _calc(
+      {
+        dateOfContract: new Date(2020, 1, 21),
+        dateFirstPayment: new Date(2020, 2, 12),
+        months,
+        percent: rate,
+        credit: sum,
+        paymentType: 0,
+      },
+      [],
+    );
   }
   return null;
 };
 
-const Results = (props) => {
-  const {
-    years,
-    months,
-    sum,
-    percent,
-    minPayment,
-  } = props;
+// const Results = (props) => {
+//   const {
+//     years,
+//     months,
+//     sum,
+//     percent,
+//     minPayment,
+//   } = props;
 
-  const formattedSum = new Intl.NumberFormat('ru').format(sum);
-  const formattedPercent = new Intl.NumberFormat('ru').format(percent);
-  const formattedMinPayment = new Intl.NumberFormat('ru').format(minPayment);
+//   const formattedSum = new Intl.NumberFormat('ru').format(sum);
+//   const formattedPercent = new Intl.NumberFormat('ru').format(percent);
+//   const formattedMinPayment = new Intl.NumberFormat('ru').format(minPayment);
 
-  return (
-    <>
-      <Typography variant="h4">
-        {months}
-        {' '}
-        месяцев (
-        {years}
-        {' '}
-        лет)
-      </Typography>
-      <Typography variant="body2" style={{ paddingBottom: '40px' }}>
-        Вам понадобится, чтобы закрыть кредит
-      </Typography>
-      <Typography variant="h4">
-        {formattedSum}
-        {' '}
-        ₽ (
-        {formattedPercent}
-        %)
-      </Typography>
-      <Typography variant="body2" style={{ paddingBottom: '40px' }}>
-        Вы переплатите банку
-      </Typography>
-      <Typography variant="h4">
-        {formattedMinPayment}
-        {' '}
-        ₽ / в месяц
-      </Typography>
-      <Typography variant="body2" style={{ paddingBottom: '40px' }}>
-        Составит минимальный обязательный платеж банку в случае форс-мажора
-      </Typography>
-      <Divider style={{ marginBottom: '32px' }} />
-    </>
-  );
-};
+//   return (
+//     <>
+//       <Typography variant="h4">
+//         {months}
+//         {' '}
+//         месяцев (
+//         {years}
+//         {' '}
+//         лет)
+//       </Typography>
+//       <Typography variant="body2" style={{ paddingBottom: '40px' }}>
+//         Вам понадобится, чтобы закрыть кредит
+//       </Typography>
+//       <Typography variant="h4">
+//         {formattedSum}
+//         {' '}
+//         ₽ (
+//         {formattedPercent}
+//         %)
+//       </Typography>
+//       <Typography variant="body2" style={{ paddingBottom: '40px' }}>
+//         Вы переплатите банку
+//       </Typography>
+//       <Typography variant="h4">
+//         {formattedMinPayment}
+//         {' '}
+//         ₽ / в месяц
+//       </Typography>
+//       <Typography variant="body2" style={{ paddingBottom: '40px' }}>
+//         Составит минимальный обязательный платеж банку в случае форс-мажора
+//       </Typography>
+//       <Divider style={{ marginBottom: '32px' }} />
+//     </>
+//   );
+// };
 
 const MainPage = () => {
   const { query, push } = useRouter();
@@ -79,6 +85,7 @@ const MainPage = () => {
     sum: null,
     rate: null,
     payment: null,
+    months: null,
     results: null,
   });
 
@@ -104,6 +111,7 @@ const MainPage = () => {
     url.searchParams.set('sum', state.sum);
     url.searchParams.set('rate', state.rate);
     url.searchParams.set('payment', state.payment);
+    url.searchParams.set('months', state.months);
     push(url.href);
   };
 
@@ -152,13 +160,26 @@ const MainPage = () => {
                 helperText="TODO: объяснить что это такое"
               />
             </div>
+            <div className={pageStyles.inputContainer}>
+              <TextField
+                onChange={handleInputChange}
+                value={state.months || ''}
+                name="months"
+                fullWidth
+                variant="outlined"
+                label="Максимальный срок кредита"
+                InputProps={{
+                  endAdornment: 'мес',
+                }}
+                helperText="TODO: объяснить что это такое"
+              />
+            </div>
             <div style={{ textAlign: 'right' }}>
               <Button color="primary" size="large" type="submin">Рассчитать</Button>
             </div>
           </form>
         </Grid>
         <Grid item xs={12} md={8}>
-          {state.results && <Results {...state.results} />}
           <Typography variant="h4">
             TODO
           </Typography>
@@ -166,21 +187,11 @@ const MainPage = () => {
             рассказать про нашу стратегию, почему нужно уменьшить обязательный платеж
             и вносить максимально возможную сумму регулярно и досрочно
           </Typography>
-          <NoSsr>
+          {state.results && (
             <pre>
-              {JSON.stringify(_calc(
-                {
-                  dateOfContract: new Date(2020, 1, 21),
-                  dateFirstPayment: new Date(2020, 2, 12),
-                  months: 240,
-                  percent: 7.49,
-                  credit: 4534128.44,
-                  paymentType: 0,
-                },
-                [],
-              ), null, 2)}
+              {JSON.stringify(state.results, null, 2)}
             </pre>
-          </NoSsr>
+          )}
         </Grid>
       </Grid>
     </Page>
