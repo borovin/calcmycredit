@@ -108,10 +108,10 @@ const MainPage = () => {
   const handleFormSubmit = (e) => {
     e.preventDefault();
     const url = new URL(window.location.href);
-    url.searchParams.set('sum', state.sum);
-    url.searchParams.set('rate', state.rate);
-    url.searchParams.set('payment', state.payment);
-    url.searchParams.set('months', state.months);
+    url.searchParams.set('sum', state.sum || '');
+    url.searchParams.set('rate', state.rate || '');
+    url.searchParams.set('payment', state.payment || '');
+    url.searchParams.set('months', state.months || '');
     push(url.href);
   };
 
