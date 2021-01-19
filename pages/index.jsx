@@ -9,22 +9,18 @@ import {
 } from 'date-fns';
 import Page from '../components/Page';
 import pageStyles from '../components/Page/Page.module.css';
-import _calc from '../utils/calc.ts';
+import { calculate } from '../utils/calc.ts';
 
 const calc = ({
   sum, rate, payment, months,
 }) => {
-  if (sum && rate && payment && months) {
-    return _calc(
-      {
-        dateOfContract: new Date(2020, 1, 21),
-        dateFirstPayment: new Date(2020, 2, 12),
-        months,
-        percent: rate,
-        credit: sum,
-        paymentType: 0,
-      },
-      [],
+  if (sum && rate && months) {
+    return calculate(
+      new Date(2020, 1, 21),
+      new Date(2020, 2, 12),
+      sum,
+      rate,
+      payment,
     );
   }
   return null;

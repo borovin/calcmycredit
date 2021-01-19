@@ -8,11 +8,17 @@ import {
 } from 'date-fns';
 
 enum EarlyRepaymentType {
-  REDUCTION_LOAN_TERM, REDUCTION_AMOUNT_PAYMENT
+  // уменьшение срока кредита
+  REDUCTION_LOAN_TERM,
+  // уменьшение размера платежа
+  REDUCTION_AMOUNT_PAYMENT,
 }
 
 enum EarlyRepaymentPaymentType {
-  COMBINATION_FULL_PAYMENT, EARLY_REPAYMENT
+  //точный платеж в месяц (обязательный + дополнительный)
+  COMBINATION_FULL_PAYMENT,
+  // дополнительный месячный платеж
+  EARLY_REPAYMENT,
 }
 
 abstract class EarlyRepayment {
@@ -76,6 +82,14 @@ class PeriodicEarlyRepayment extends EarlyRepayment {
   }
 }
 
+export function newPeriodicEarlyRepayment(input: Object): PeriodicEarlyRepayment {
+  if (input.payment !== undefined) {
+    return new PeriodicEarlyRepayment(input.type, input.paymentType, input.payment, input.start, input.end);
+  }
+
+  return undefined;
+}
+
 enum PaymentType {
   ANNUITY, DIFFERENTIATED
 }
@@ -96,20 +110,20 @@ class PaymentInfo {
   earlyRepayment?: number;
 }
 
-function scale(val: number, s: number): number {
+function internalRound(val: number, s: number): number {
   const realScale = 10 ** s;
   return Math.round(val * realScale) / realScale;
 }
 
 function calcAnnuityPayment(percent: number, monthsCount: number, creditBody: number): number {
-  const percentMonth = scale(percent / (12 * 100), 10);
+  const percentMonth = internalRound(percent / (12 * 100), 10);
   const temp = (1 + percentMonth) ** monthsCount;
 
-  return scale((creditBody * percentMonth * temp) / (temp - 1), 10);
+  return internalRound((creditBody * percentMonth * temp) / (temp - 1), 10);
 }
 
 function calcDifferentiatedBodyPayment(percent: number, monthsCount: number, creditBody: number): number {
-  return scale(creditBody / (monthsCount), 10);
+  return internalRound(creditBody / (monthsCount), 10);
 }
 
 function plusDays(a: Date, i: number): Date {
@@ -129,9 +143,9 @@ function getNonWeekendDate(date: Date): Date {
 }
 
 function getPercentValueOfPayment(prevPaymentDate: Date, paymentDate: Date, creditBody: number, percent: number): number {
-  const multiplier = scale((creditBody * percent) / 100, 10);
+  const multiplier = internalRound((creditBody * percent) / 100, 10);
   if (paymentDate.getFullYear() === prevPaymentDate.getFullYear()) {
-    return multiplier * scale(differenceInDays(paymentDate, prevPaymentDate) / getDaysInYear(prevPaymentDate), 10);
+    return multiplier * internalRound(differenceInDays(paymentDate, prevPaymentDate) / getDaysInYear(prevPaymentDate), 10);
   }
   /*
         Проц = ОД x Ставка x (1 янв 2012 - 22 дек 2011) / (100 * 365) + ОД x Ставка x (22 янв 2012 - 1 янв 2012) / (100 * 366)
@@ -139,8 +153,8 @@ function getPercentValueOfPayment(prevPaymentDate: Date, paymentDate: Date, cred
 
   const firstDateOfYear = new Date(paymentDate.getFullYear(), 0, 1);
   return multiplier * (
-    scale(differenceInDays(firstDateOfYear, prevPaymentDate) / getDaysInYear(prevPaymentDate), 10)
-    + scale(differenceInDays(paymentDate, firstDateOfYear) / getDaysInYear(prevPaymentDate), 10)
+    internalRound(differenceInDays(firstDateOfYear, prevPaymentDate) / getDaysInYear(prevPaymentDate), 10)
+    + internalRound(differenceInDays(paymentDate, firstDateOfYear) / getDaysInYear(prevPaymentDate), 10)
   );
 }
 
@@ -168,7 +182,7 @@ function filterEarlyRepayment(
     payment += earlyRepayment.getPayment();
   }
 
-  if (scale(payment, 0) === 0) {
+  if (internalRound(payment, 0) === 0) {
     return null;
   }
 
@@ -184,11 +198,115 @@ class CreditInput {
   paymentType: PaymentType;
 }
 
-export default function processWithMonths(
+class CalculationResult {
+  payments: Array<PaymentInfo>;
+  overpayment: number;
+  finalNumberMonths: number;
+
+  constructor() {
+    this.finalNumberMonths = 0;
+    this.overpayment = 0;
+    this.payments = new Array<PaymentInfo>();
+  }
+}
+
+class YearResult {
+  year: number;
+  types: Array<TypeCalculation>;
+}
+
+class TypeCalculation {
+  overpayment: number;
+  months: number;
+  paymentType: PaymentType;
+  firstPayment: number;
+  earlyRepaymentType: EarlyRepaymentType;
+}
+
+export function calculate(
+  dateOfContract: Date,
+  dateFirstPayment: Date,
+  credit: number,
+  percent: number,
+  payment: number
+): Array<YearResult> {
+  let result = new Array<YearResult>();
+  let earlyRepaymentsReductionAmountPayment = new Array<EarlyRepayment>();
+  let earlyRepaymentsReductionLoanTerm = new Array<EarlyRepayment>();
+  if (payment !== undefined) {
+    earlyRepaymentsReductionAmountPayment.push(
+      new PeriodicEarlyRepayment(EarlyRepaymentType.REDUCTION_AMOUNT_PAYMENT, EarlyRepaymentPaymentType.COMBINATION_FULL_PAYMENT, payment, dateFirstPayment, null)
+    );
+    earlyRepaymentsReductionLoanTerm.push(
+      new PeriodicEarlyRepayment(EarlyRepaymentType.REDUCTION_LOAN_TERM, EarlyRepaymentPaymentType.COMBINATION_FULL_PAYMENT, payment, dateFirstPayment, null)
+    );
+  }
+  for (let i = 1; i <= 30; i++) {
+    let yr = new YearResult();
+    yr.year = i;
+    result.push(yr);
+    yr.types = new Array<TypeCalculation>();
+
+    if (earlyRepaymentsReductionAmountPayment.length > 0) {
+      yr.types.push(process(PaymentType.ANNUITY, EarlyRepaymentType.REDUCTION_AMOUNT_PAYMENT, processWithMonths({
+        credit,
+        dateFirstPayment,
+        dateOfContract,
+        months: i * 12,
+        percent,
+        paymentType: PaymentType.ANNUITY
+      }, earlyRepaymentsReductionAmountPayment)));
+      yr.types.push(process(PaymentType.DIFFERENTIATED, EarlyRepaymentType.REDUCTION_AMOUNT_PAYMENT, processWithMonths({
+        credit,
+        dateFirstPayment,
+        dateOfContract,
+        months: i * 12,
+        percent,
+        paymentType: PaymentType.DIFFERENTIATED
+      }, earlyRepaymentsReductionAmountPayment)));
+    }
+    if (earlyRepaymentsReductionLoanTerm.length > 0) {
+      yr.types.push(process(PaymentType.ANNUITY, EarlyRepaymentType.REDUCTION_LOAN_TERM, processWithMonths({
+        credit,
+        dateFirstPayment,
+        dateOfContract,
+        months: i * 12,
+        percent,
+        paymentType: PaymentType.ANNUITY
+      }, earlyRepaymentsReductionLoanTerm)));
+      yr.types.push(process(PaymentType.DIFFERENTIATED, EarlyRepaymentType.REDUCTION_LOAN_TERM, processWithMonths({
+        credit,
+        dateFirstPayment,
+        dateOfContract,
+        months: i * 12,
+        percent,
+        paymentType: PaymentType.DIFFERENTIATED
+      }, earlyRepaymentsReductionLoanTerm)));
+    }
+  }
+
+  return result;
+}
+
+function process(paymentType: PaymentType, earlyRepaymentType: EarlyRepaymentType, input: CalculationResult): TypeCalculation {
+  let result = new TypeCalculation();
+  result.earlyRepaymentType = earlyRepaymentType;
+  result.paymentType = paymentType;
+  result.months = input.finalNumberMonths;
+  result.overpayment = input.overpayment;
+  if (input.payments) {
+    result.firstPayment = input.payments[0].mandatoryPayment;
+  }
+
+  return result;
+}
+
+export function processWithMonths(
   input: CreditInput,
   earlyRepayments: Array<EarlyRepayment>
-): Array<PaymentInfo> {
-  const result = new Array<PaymentInfo>();
+): CalculationResult {
+  const result = new CalculationResult();
+
   let first = input.dateOfContract != null;
   let leastMonths = input.months;
   const monthForCalc = input.dateOfContract != null ? (input.months - 1) : input.months;
@@ -216,23 +334,23 @@ export default function processWithMonths(
       mandatoryPayment = mandatoryBodyPayment + percentValueOfPayment;
     }
     const paymentInfo = new PaymentInfo();
-    result.push(paymentInfo);
+    result.payments.push(paymentInfo);
     paymentInfo.paymentDate = getNonWeekendDate(paymentDate);
     paymentInfo.creditBodyBeforePayment = creditBody;
-    paymentInfo.mandatoryPaymentPercent = scale(percentValueOfPayment, 2);
+    paymentInfo.mandatoryPaymentPercent = internalRound(percentValueOfPayment, 2);
 
     let filtered = null;
     if (first) {
-      paymentInfo.creditBodyAfterPayment = creditBody;
-      paymentInfo.mandatoryPayment = scale(percentValueOfPayment, 2);
+      paymentInfo.creditBodyAfterPayment = internalRound(creditBody, 2);
+      paymentInfo.mandatoryPayment = internalRound(percentValueOfPayment, 2);
       paymentInfo.mandatoryPaymentBody = 0;
     } else {
       if (mandatoryPayment > creditBody) {
-        paymentInfo.mandatoryPayment = scale(creditBody + percentValueOfPayment, 2);
+        paymentInfo.mandatoryPayment = internalRound(creditBody + percentValueOfPayment, 2);
         paymentInfo.mandatoryPaymentBody = creditBody;
       } else {
-        paymentInfo.mandatoryPayment = scale(mandatoryPayment, 2);
-        paymentInfo.mandatoryPaymentBody = scale(mandatoryBodyPayment, 2);
+        paymentInfo.mandatoryPayment = internalRound(mandatoryPayment, 2);
+        paymentInfo.mandatoryPaymentBody = internalRound(mandatoryBodyPayment, 2);
       }
 
       creditBody = Math.max(creditBody - mandatoryPayment + percentValueOfPayment, 0);
@@ -244,54 +362,57 @@ export default function processWithMonths(
           if (EarlyRepaymentPaymentType.COMBINATION_FULL_PAYMENT === filtered.getPaymentType()) {
             const leastReadyToPay = filtered.getPayment() - mandatoryPayment;
             if (leastReadyToPay >= creditBody) {
-              paymentInfo.earlyRepayment = creditBody;
+              paymentInfo.earlyRepayment = internalRound(creditBody, 2);
               creditBody = 0;
             } else {
-              paymentInfo.earlyRepayment = leastReadyToPay;
+              paymentInfo.earlyRepayment = internalRound(leastReadyToPay, 2);
               creditBody -= leastReadyToPay;
             }
           } else if (EarlyRepaymentPaymentType.EARLY_REPAYMENT === filtered.getPaymentType()) {
             if (filtered.getPayment() >= creditBody) {
-              paymentInfo.earlyRepayment = creditBody;
+              paymentInfo.earlyRepayment = internalRound(creditBody, 2);
               creditBody = 0;
             } else {
-              paymentInfo.earlyRepayment = filtered.getPayment();
+              paymentInfo.earlyRepayment = internalRound(filtered.getPayment(), 2);
               creditBody -= filtered.getPayment();
             }
           }
         }
       }
 
-      paymentInfo.creditBodyAfterPayment = creditBody;
+      paymentInfo.creditBodyAfterPayment = internalRound(creditBody, 2);
     }
 
     prevPaymentDate = paymentDate;
     paymentDate = add(paymentDate, { months: 1, });
     leastMonths -= 1;
+    result.finalNumberMonths += 1;
+    result.overpayment += paymentInfo.mandatoryPaymentPercent;
 
-    if (scale(creditBody, 2) === 0) {
-      break;
-    }
-
-    if (first) {
-      first = false;
-    } else if (filtered != null && EarlyRepaymentType.REDUCTION_AMOUNT_PAYMENT === filtered.getType()) {
-      if (PaymentType.ANNUITY === input.paymentType) {
-        mandatoryPayment = calcAnnuityPayment(input.percent, leastMonths, creditBody);
-      } else if (PaymentType.DIFFERENTIATED === input.paymentType) {
-        mandatoryBodyPayment = calcDifferentiatedBodyPayment(input.percent, leastMonths, creditBody);
+    if (internalRound(creditBody, 2) !== 0) {
+      if (first) {
+        first = false;
+      } else if (filtered != null && EarlyRepaymentType.REDUCTION_AMOUNT_PAYMENT === filtered.getType()) {
+        if (PaymentType.ANNUITY === input.paymentType) {
+          mandatoryPayment = calcAnnuityPayment(input.percent, leastMonths, creditBody);
+        } else if (PaymentType.DIFFERENTIATED === input.paymentType) {
+          mandatoryBodyPayment = calcDifferentiatedBodyPayment(input.percent, leastMonths, creditBody);
+        }
       }
+    } else {
+      break;
     }
   }
 
+  result.overpayment = internalRound(result.overpayment, 2);
   return result;
 }
 
-function printReport(payments: Array<PaymentInfo>) {
+function printReport(output: CalculationResult) {
   let totalPercentValue = 0;
   let total = 0;
   let months = 0;
-  for (const p of payments) {
+  for (const p of output.payments) {
     //            System.out.println(MessageFormat.format(
     //                    "{0}\t{1}\t{2,number,#}\t{3,number,#}\t{4,number,#}\t{5,number,#}\t{6,number,#}\t{7,number,#}",
     //                    i + 1, p.getPaymentDate(), p.getCreditBodyBeforePayment(), p.getMandatoryPayment(), p.getMandatoryPaymentBody(), p.getMandatoryPaymentPercent(), p.getEarlyRepayment(), p.getCreditBodyAfterPayment())
@@ -300,8 +421,8 @@ function printReport(payments: Array<PaymentInfo>) {
     totalPercentValue += p.mandatoryPaymentPercent;
     months += 1;
   }
-  console.log(`Total percents:${scale(totalPercentValue, 2)}`);
-  console.log(` Total body:${scale(total, 2)}`);
+  console.log(`Total percents:${internalRound(totalPercentValue, 2)}`);
+  console.log(` Total body:${internalRound(total, 2)}`);
   console.log(` Total months:${months}`);
 }
 
